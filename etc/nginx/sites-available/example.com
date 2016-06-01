@@ -1,4 +1,4 @@
-# Server Block with forcing of SSL + Cloudflare
+# Server Block with forcing of SSL + Redirect to www.example.com + Cloudflare
 server {
 	listen 80 ;
 	listen 443 ssl;
@@ -15,6 +15,7 @@ server {
 
         index index.html;
 
+	include /etc/nginx/snippet/redirect-www.conf;
 	include /etc/nginx/snippet/letsencrypt.conf;
 	include /etc/nginx/snippet/forcessl.conf;
 	include /etc/nginx/snippet/cloudflare-fix-ip.conf;
