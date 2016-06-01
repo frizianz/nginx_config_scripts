@@ -1,4 +1,23 @@
-# Server Block with forcing of SSL + Redirect to www.example.com + Cloudflare
+# Server block to redirect to www.example.com
+server {
+        listen 80 ;
+        listen 443 ssl;
+        server_name example.com ;
+
+        access_log /var/log/nginx/example.com-access.log;
+        error_log /var/log/nginx/example.com-error.log error;
+
+        root /var/www/root;
+
+        ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+        include /etc/nginx/snippet/ssl.conf;
+
+        include /etc/nginx/snippet/redirect-www.conf;
+
+}
+
+# Server Block with forcing of SSL + Cloudflare
 server {
 	listen 80 ;
 	listen 443 ssl;
