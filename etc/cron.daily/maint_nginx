@@ -1,0 +1,91 @@
+#!/bin/bash
+
+#
+# Date: 01-06-2016
+# Author: Fraser McGlinn (fraser@mcglinn.nz)
+# Purpose: To automate the updating of Nginx Config and Snippets
+# Revision: 1.0.0
+#
+
+# Verify Working Directories Exist
+
+if [ ! -d "/etc/cloudflare/" ]; then
+	mkdir -p /etc/cloudflare
+fi
+
+if [ ! -d "/etc/nginx/snippet" ]; then
+	mkdir -p /etc/nginx/snippet
+fi
+
+# Update Nginx SSL config from Cloudflare Repo
+function cloudflare_update_ssl {
+
+	CF_CONFIGDIR='/etc/cloudflare'
+	NGINXSNIPPETDIR='/etc/nginx/snippet'
+
+	if [ ! -d "$CF_CONFIGDIR/sslconfig" ]
+	then
+		cd $CF_CONFIGDIR
+		git clone https://github.com/cloudflare/sslconfig.git
+	fi
+
+	cd $CF_CONFIGDIR/sslconfig
+
+	git pull
+
+	# Diff git config to local
+	diff -q $CF_CONFIGDIR/sslconfig/conf $NGINXSNIPPETDIR/ssl.conf
+	STATUS=$?
+
+	if [ $STATUS -ne '0' ]
+	then
+		cp $CF_CONFIGDIR/sslconfig/conf $NGINXSNIPPETDIR/ssl.conf
+		service nginx reload
+	fi
+
+}
+
+# Update CF IP Ranges
+function cloudflare_update_ip
+{
+	# Set Nginx Config for Real IP List
+	CONFIG='/etc/nginx/snippet/cloudflare-set-real-ip-list.conf'
+	
+	# Get New IP lists
+	wget -q https://www.cloudflare.com/ips-v4 -O /etc/cloudflare/ips-v4.new
+	wget -q https://www.cloudflare.com/ips-v6 -O /etc/cloudflare/ips-v6.new
+
+	# Diff downloaded IP list to local
+	diff -q /etc/cloudflare/ips-v4 /etc/cloudflare/ips-v4.new
+	STATUS_v4=$?
+
+	diff -q /etc/cloudflare/ips-v6 /etc/cloudflare/ips-v6.new
+	STATUS_v6=$?
+
+	# If Different then do stuff
+	if [ $STATUS_v4 -ne '0' ] || [ $STATUS_v6 -ne '0' ]
+	then
+		mv $CONFIG $CONFIG-old
+		echo "# Start IPv4 CF IP's" >> $CONFIG
+		for i in `cat /etc/cloudflare/ips-v4.new` ; do
+			echo "set_real_ip_from $i;" >> $CONFIG
+		done
+		
+		echo >> $CONFIG
+
+		echo "# Start IPv6 CF IP's" >> $CONFIG
+		for i in `cat /etc/cloudflare/ips-v6.new` ; do
+			echo "set_real_ip_from $i;" >> $CONFIG
+		done
+
+		cp /etc/cloudflare/ips-v4.new /etc/cloudflare/ips-v4
+		cp /etc/cloudflare/ips-v6.new /etc/cloudflare/ips-v6
+
+		service nginx reload
+	fi
+
+}
+
+# Run Functions
+cloudflare_update_ssl
+cloudflare_update_ip
